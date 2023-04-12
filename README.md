@@ -46,26 +46,34 @@ In theory, I could capture an "ON" signal, an "OFF" signal, a "COOL/HEAT" signal
 For now, the solution was to *somehow* send commands through the IR channel.
 
 
+### Tech stack
+
+I am a .Net dev. I love .Net and last year I was introduced to [nanoFramework](https://www.nanoframework.net/). This is an open-source project to bring C# and .NET to the world of embedded systems. There are various reasons to choose nanoFramework:
+
+- Easy to get started with as a beginner in the world of IoT and embedded system programming.
+- It is a serious, open-source project used in personal and commercial solutions and not only to blink LEDs.
+- As a developer, you can be extremely productive with .NET and C# when compared to the traditional C/C++.
+- You can also use Visual Studio with nanoFramework to write, deploy, and debug code directly on the target device. It is very easy to place breakpoints, execute the program and step through the code line by line while inspecting variables and other state. All within the Visual Studio IDE.
+- Dependency management is available through NuGet where nf and the community publish a lot of libraries.
+- nanoFramework is also very easy to extend and add new stuff or improve what's already there.
+- There's a great community that's very friendly and supportive.
+- But most importantly, it is just so damn fun to work with!
+
+So you can see why nf is my choice for this side project. Keep in mind that there are other projects to bring C# & .Net to the micro-controller world such as [Meadow](https://www.wildernesslabs.co/) & TinyCLR by [GHI](https://www.ghielectronics.com/) but I don't have much experience with them at this time.
+
 The next thing I had to figure was probably the easiest in this project:
 
 ### Sensing temperature & humidity
 
-[In my previous post](https://blog.mrcsharp.com.au/post/using-dht22-with-nanoframework/), I used the DHT22 sensor to get the room temperature and humidity level.
+[In my previous post](file:///post/using-dht22-with-nanoframework/), I used the DHT22 sensor to get the room temperature and humidity level.
 
 DHT22 is simple to use, requires 3-5V power, and provides the measurements using a digital signal on a single pin. Perfect for use with a Micro-Controller Unit.
 
 Ok, so I know what to use to get the temp & humidity. How can I talk to the DHT22 module?
 
-### Tech stack
-
-I am a .Net dev. I love .Net. So [nanoFramework](https://www.nanoframework.net/) is my choice for this task. Keep in mind that there are other projects to bring C# & .Net to the micro-controller world such as [Meadow](https://www.wildernesslabs.co/) & TinyCLR via [GHI](https://www.ghielectronics.com/) but I don't have much experience with them at this time.
-
-I have been playing around with nanoFramework for a while now and I absolutely love it. It is an amazing feeling to see C# running on low powered MCUs such as ESP32. It integrates beautifully with Visual Studio and its debugger which means I can easily place breakpoints in my code and inspect and change variable values at runtime. This trumps Arduino IDE and makes debugging so much easier.
-
 ### MCU
 
 ESP32 is a very good choice for this project. It has support for IR communication using its built-in RMT module. It is also compatible with nanoFramework making it ideal for what I am doing here.
-
 
 ## The Journey
 
