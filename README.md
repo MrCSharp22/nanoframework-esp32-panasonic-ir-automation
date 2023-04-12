@@ -168,9 +168,6 @@ But 64 != 216 bits. So what is going on here?
 
 #### nanoFramework's relationship with ESP IDF
 
-> [!warning] Check with nf Discord
-> Need to check if this section describing how nf is related to ESP IDF is accurate. Mainly if nf sits on top of IDF or alongside it.
-
 nanoFramework integrates with the ESP IDF framework. This integrations allows nanoFramework to communicate with the various hardware functions that ESP32 MCUs offer (GPIO, RMT, I2C, Wifi, Bluetooth, etc...).
 
 ESP IDF methods are then exposed by nanoFramework and made available to the C# managed code. Libraries such as the nanoFramework ESP32 RMT one make use of these native methods.
