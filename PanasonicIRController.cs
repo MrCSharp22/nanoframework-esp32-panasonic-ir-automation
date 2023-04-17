@@ -23,7 +23,10 @@ namespace nanoFramework_Panasonic_Automation
         private static RmtCommand Pause = new RmtCommand(Pulse, true, PauseSpace, false);
         private static RmtCommand End = new RmtCommand(Pulse, true, 0, false);
 
-        public static void TurnOn(byte temp, PanasonicACMode mode, int irChannelPinNumber)
+        internal const byte MinTemperature = 16;
+        internal const byte MaxTemperature = 30;
+
+        public static void TurnOn(byte targetTemperature, PanasonicACMode mode, int irChannelPinNumber)
         {
             var commandData = GetStartingCommandData();
 
@@ -34,7 +37,7 @@ namespace nanoFramework_Panasonic_Automation
             commandData[OnOffModeByteIndex] |= (byte)mode;
 
             //set temp
-            commandData[TempByteIndex] = (byte)(temp * 2);
+            commandData[TempByteIndex] = (byte)(targetTemperature * 2);
 
             SendIRCommand(irChannelPinNumber, commandData);
         }

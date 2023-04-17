@@ -5,116 +5,98 @@ using System.Threading;
 
 namespace nanoFramework_Panasonic_Automation
 {
-    public class Program
-    {
-        public static void Main()
-        {
-            Debug.WriteLine("INFO ==> PROGRAM STARTED.");
+	public class Program
+	{
+		private const int statusLedPin = 22;
+		private const int dhtEchoPin = 33;
+		private const int dhtTriggerPin = 32;
+		private const int dhtWakePin = 26;
+		private const int irWakePin = 15;
+		private const int irSignalPin = 16;
+		private const string area = "Bedroom";
 
-            var statusLedPin = 22;
-            var dhtEchoPin = 33;
-            var dhtTriggerPin = 32;
-            var dhtWakePin = 26;
-            var irWakePin = 15;
-            var irSignalPin = 16;
-            var area = "Bedroom";
+		public static void Main()
+		{
+			Debug.WriteLine("INFO ==> PROGRAM STARTED.");
 
-            using var gpioController = new GpioController();
-            using var statusLed = gpioController.OpenPin(statusLedPin, PinMode.Output);
-            using var dhtWaker = gpioController.OpenPin(dhtWakePin, PinMode.Output);
-            using var irWaker = gpioController.OpenPin(irWakePin, PinMode.Output);
+			using var gpioController = new GpioController();
+			using var statusLed = gpioController.OpenPin(statusLedPin, PinMode.Output);
+			using var dhtWaker = gpioController.OpenPin(dhtWakePin, PinMode.Output);
+			using var irWaker = gpioController.OpenPin(irWakePin, PinMode.Output);
+			using var dhtSensor = new Iot.Device.DHTxx.Esp32.Dht22(dhtEchoPin, dhtTriggerPin, gpioController: gpioController);
 
-            using var dhtSensor = new Iot.Device.DHTxx.Esp32.Dht22(dhtEchoPin, 
-                dhtTriggerPin, 
-                gpioController: gpioController);
+			var busySignal = SignalBusyStatus(statusLed);
+			busySignal.Start();
 
-            var busyStatusThread = SignalBusyStatus(statusLed);
-            busyStatusThread.Start();
+			// wake the DHT22 now. This should give it enough time to "warm up"
+			dhtWaker.Write(PinValue.High);
 
-            // wake the DHT22 now. This should give it enough time to "warm up"
-            dhtWaker.Write(PinValue.High);
+			// while DHT22 is "warming up", connect to wifi, mqtt, and execute needed announcements
+			Wifi.Connect();
+			Mqtt.Connect();
+			Mqtt.AnnounceTempSensorToHomeAssistant(area);
+			Mqtt.AnnounceHumiditySensorToHomeAssistant(area);
 
-            Wifi.Connect();
-            Mqtt.Connect();
+			var attemptNumber = 0;
+			while (attemptNumber < 5)
+			{
+				var temp = dhtSensor.Temperature;
+				var humidity = dhtSensor.Humidity;
 
-            Mqtt.AnnounceTempSensorToHomeAssistant(area);
-            Thread.Sleep(1000);
-            Mqtt.AnnounceHumiditySensorToHomeAssistant(area);
+				if (!dhtSensor.IsLastReadSuccessful)
+				{
 
-            // Wait a bit to give the sensor and Wifi a chance to stabilize
-            Thread.Sleep(500);
+					Debug.WriteLine($"ERROR ==> FAILED TO READ TEMP/HUMIDITY. ATTEMPT {attemptNumber}.");
+					Thread.Sleep(1000);
 
-            var attemptNumber = 0;
-            while (attemptNumber < 5)
-            {
-                var temp = dhtSensor.Temperature;
-                var humidity = dhtSensor.Humidity;
+					attemptNumber++;
+					continue;
+				}
 
-                if (!dhtSensor.IsLastReadSuccessful)
-                {
+				PanasonicAcAutomator.Process(temp, humidity, irSignalPin, irWaker);
 
-                    Debug.WriteLine($"ERROR ==> FAILED TO READ TEMP/HUMIDITY. ATTEMPT {attemptNumber}.");
+				Mqtt.PublishData(area, temp.DegreesCelsius, humidity.Percent);
+				break;
+			}
 
-                    attemptNumber++;
-                    Thread.Sleep(1000);
+			Debug.WriteLine($"INFO ==> GOING TO SLEEP. SEE YOU SOON!");
 
-                    continue;
-                }
+			// clean up
+			Mqtt.Disconnect();
 
-                // very basic automation implementation (WIP / Incomplete)
-                if (temp.DegreesCelsius > 25)
-                {
-                    irWaker.Write(PinValue.High);
-                    PanasonicIRController.TurnOn(16, PanasonicACMode.Cool, irSignalPin);
-                    irWaker.Write(PinValue.Low);
-                }
-                else if (temp.DegreesCelsius < 20)
-                {
-                    irWaker.Write(PinValue.High);
-                    PanasonicIRController.TurnOn(25, PanasonicACMode.Heat, irSignalPin);
-                    irWaker.Write(PinValue.Low);
-                }
+			// put the DHT22 and IR to sleep to save on power
+			dhtWaker.Write(PinValue.Low);
+			irWaker.Write(PinValue.Low);
 
-                Mqtt.PublishData(area, temp.DegreesCelsius, humidity.Percent);
-                break;
-            }
+			busySignal.Abort();
 
-            Debug.WriteLine("INFO ==> GOING TO SLEEP. SEE YOU SOON!");
+			// put the MCU to sleep and set it to wake up in 1 minute
+			Power.Sleep(TimeSpan.FromMinutes(15));
+		}
 
-            Thread.Sleep(1000);
-            Mqtt.Disconnect();
-            busyStatusThread.Abort();
+		private static Thread SignalBusyStatus(GpioPin led)
+		{
+			var thread = new Thread(() =>
+			{
+				try
+				{
+					while (true)
+					{
+						led.Write(PinValue.Low);
+						Thread.Sleep(250);
 
-            // put the DHT22 to sleep to save on power
-            dhtWaker.Write(PinValue.Low);
+						led.Write(PinValue.High);
+						Thread.Sleep(500);
+					}
+				}
+				catch (ThreadAbortException)
+				{
+					// make sure the led is switched off to save power
+					led.Write(PinValue.Low);
+				}
+			});
 
-            // put the MCU to sleep and set it to wake up in 15 minutes
-            Power.Sleep(TimeSpan.FromMinutes(15));
-        }
-
-        private static Thread SignalBusyStatus(GpioPin led)
-        {
-            var thread = new Thread(() =>
-            {
-                try
-                {
-                    while (true)
-                    {
-                        led.Write(PinValue.Low);
-                        Thread.Sleep(250);
-
-                        led.Write(PinValue.High);
-                        Thread.Sleep(500);
-                    }
-                }
-                catch (ThreadAbortException)
-                {
-                    // make sure the led is switched off to save power
-                    led.Write(PinValue.Low);
-                }
-            });
-
-            return thread;
-        }
-    }
+			return thread;
+		}
+	}
 }
